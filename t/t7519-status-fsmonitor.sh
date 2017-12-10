@@ -171,9 +171,7 @@ EOF
 
 # test that newly added files are marked valid
 test_expect_success 'newly added files are marked valid' '
-	git add new &&
-	git add dir1/new &&
-	git add dir2/new &&
+	git add new dir1/new dir2/new &&
 	git ls-files -f >actual &&
 	test_cmp expect actual
 '

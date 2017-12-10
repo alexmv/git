@@ -110,7 +110,6 @@ static void replace_index_entry(struct index_state *istate, int nr, struct cache
 	ce->ce_flags &= ~CE_HASHED;
 	set_index_entry(istate, nr, ce);
 	ce->ce_flags |= CE_UPDATE_IN_BASE;
-	mark_fsmonitor_invalid(istate, ce);
 	istate->cache_changed |= CE_ENTRY_CHANGED;
 }
 
