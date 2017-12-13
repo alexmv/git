@@ -5,8 +5,9 @@ int cmd_main(int ac, const char **av)
 	struct index_state *istate = &the_index;
 	int i;
 
+	setenv("GIT_FSMONITOR_TEST", "keep", 1);
 	setup_git_directory();
-	if (do_read_index(istate, get_index_file(), 0) < 0)
+	if (read_index(istate) < 0)
 		die("unable to read index file");
 	if (!istate->fsmonitor_last_update) {
 		printf("no fsmonitor\n");
