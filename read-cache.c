@@ -2076,6 +2076,7 @@ int discard_index(struct index_state *istate)
 		istate->ce_mem_pool = NULL;
 	}
 
+	istate->fsmonitor_last_update = 0;
 	return 0;
 }
 
