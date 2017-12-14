@@ -1306,6 +1306,7 @@ int unpack_trees(unsigned len, struct tree_desc *t, struct unpack_trees_options 
 	o->result.timestamp.sec = o->src_index->timestamp.sec;
 	o->result.timestamp.nsec = o->src_index->timestamp.nsec;
 	o->result.version = o->src_index->version;
+	o->result.fsmonitor_last_update = o->src_index->fsmonitor_last_update;
 	if (!o->src_index->split_index) {
 		o->result.split_index = NULL;
 	} else if (o->src_index == o->dst_index) {

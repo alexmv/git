@@ -11,12 +11,9 @@ test_description='git status with file system watcher'
 # GIT_FSMONITOR_TEST=fsmonitor-all and run your tests.
 #
 
-# Note, after "git reset --hard HEAD" no extensions exist other than 'TREE'
-# "git update-index --fsmonitor" can be used to get the extension written
-# before testing the results.
-
 clean_repo () {
 	git reset --hard HEAD &&
+	git update-index --no-fsmonitor &&
 	git clean -fd
 }
 
@@ -347,6 +344,46 @@ test_expect_success UNTRACKED_CACHE 'ignore .git changes when invalidating UNTR'
 	grep "directory invalidation" trace-after >>after &&
 	# UNTR extension unchanged, dir invalidation count unchanged
 	test_cmp before after
+'
+
+# Checking out HEAD with no local modifications updates all entries to
+# be valid, since the tree and index are set to the same tree
+cat >expect <<EOF &&
+h dir1/modified
+h dir1/tracked
+h dir2/modified
+h dir2/tracked
+h modified
+h tracked
+EOF
+
+test_expect_success 'checkout does not drop fsmonitor state' '
+	write_integration_script &&
+	clean_repo &&
+	git update-index --fsmonitor  &&
+	git checkout HEAD &&
+	git ls-files -f >actual &&
+	test_cmp expect actual
+'
+
+# Checking out HEAD with local modifications updates but those all
+# entries to be valid
+cat >expect <<EOF &&
+H dir1/modified
+h dir1/tracked
+H dir2/modified
+h dir2/tracked
+H modified
+h tracked
+EOF
+
+test_expect_success 'checkout with dirty tree keeps modified files dirty' '
+	write_integration_script &&
+	dirty_repo &&
+	git update-index --fsmonitor  &&
+	git checkout HEAD &&
+	git ls-files -f >actual &&
+	test_cmp expect actual
 '
 
 test_done
