@@ -3778,7 +3778,7 @@ static int reuse_worktree_file(const char *name, const struct object_id *oid, in
 	/*
 	 * If ce matches the file in the work tree, we can reuse it.
 	 */
-	if (ce_uptodate(ce) ||
+	if (ce_uptodate(ce) || (ce->ce_flags & CE_FSMONITOR_VALID) ||
 	    (!lstat(name, &st) && !ce_match_stat(ce, &st, 0)))
 		return 1;
 

@@ -24,6 +24,7 @@
 #include "submodule-config.h"
 #include "submodule.h"
 #include "advice.h"
+#include "wt-status.h"
 
 static const char * const checkout_usage[] = {
 	N_("git checkout [<options>] <branch>"),
@@ -484,8 +485,10 @@ static int merge_working_tree(const struct checkout_opts *opts,
 	if (read_cache_preload(NULL) < 0)
 		return error(_("index file corrupt"));
 
+	refresh_cache(REFRESH_QUIET);
+
 	resolve_undo_clear();
-	if (opts->force) {
+	if (opts->force || (!has_uncommitted_changes(0) && !has_unstaged_changes(0))) {
 		ret = reset_tree(get_commit_tree(new_branch_info->commit),
 				 opts, 1, writeout_error);
 		if (ret)
@@ -501,8 +504,6 @@ static int merge_working_tree(const struct checkout_opts *opts,
 		topts.dst_index = &the_index;
 
 		setup_unpack_trees_porcelain(&topts, "checkout");
-
-		refresh_cache(REFRESH_QUIET);
 
 		if (unmerged_cache()) {
 			error(_("you need to resolve your current index first"));
