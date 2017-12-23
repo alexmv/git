@@ -36,6 +36,7 @@ static int line_terminator = '\n';
 static int debug_mode;
 static int show_eol;
 static int recurse_submodules;
+static int exclude_standard;
 
 static const char *prefix;
 static int max_prefix_len;
@@ -344,6 +345,8 @@ static void show_files(struct repository *repo, struct dir_struct *dir)
 				continue;
 			if (ce_skip_worktree(ce))
 				continue;
+			if (ce->ce_flags & CE_FSMONITOR_VALID)
+				continue;
 			err = lstat(fullname.buf, &st);
 			if (show_deleted && err)
 				show_ce(repo, dir, ce, fullname.buf, tag_removed);
@@ -470,39 +473,6 @@ static const char * const ls_files_usage[] = {
 	NULL
 };
 
-static int option_parse_exclude(const struct option *opt,
-				const char *arg, int unset)
-{
-	struct string_list *exclude_list = opt->value;
-
-	exc_given = 1;
-	string_list_append(exclude_list, arg);
-
-	return 0;
-}
-
-static int option_parse_exclude_from(const struct option *opt,
-				     const char *arg, int unset)
-{
-	struct dir_struct *dir = opt->value;
-
-	exc_given = 1;
-	add_excludes_from_file(dir, arg);
-
-	return 0;
-}
-
-static int option_parse_exclude_standard(const struct option *opt,
-					 const char *arg, int unset)
-{
-	struct dir_struct *dir = opt->value;
-
-	exc_given = 1;
-	setup_standard_excludes(dir);
-
-	return 0;
-}
-
 int cmd_ls_files(int argc, const char **argv, const char *cmd_prefix)
 {
 	int require_work_tree = 0, show_tag = 0, i;
@@ -510,6 +480,7 @@ int cmd_ls_files(int argc, const char **argv, const char *cmd_prefix)
 	struct dir_struct dir;
 	struct exclude_list *el;
 	struct string_list exclude_list = STRING_LIST_INIT_NODUP;
+	struct string_list exclude_file_list = STRING_LIST_INIT_NODUP;
 	struct option builtin_ls_files_options[] = {
 		/* Think twice before adding "--nul" synonym to this */
 		OPT_SET_INT('z', NULL, &line_terminator,
@@ -546,17 +517,14 @@ int cmd_ls_files(int argc, const char **argv, const char *cmd_prefix)
 			N_("show unmerged files in the output")),
 		OPT_BOOL(0, "resolve-undo", &show_resolve_undo,
 			    N_("show resolve-undo information")),
-		{ OPTION_CALLBACK, 'x', "exclude", &exclude_list, N_("pattern"),
-			N_("skip files matching pattern"),
-			0, option_parse_exclude },
-		{ OPTION_CALLBACK, 'X', "exclude-from", &dir, N_("file"),
-			N_("exclude patterns are read from <file>"),
-			0, option_parse_exclude_from },
+		OPT_STRING_LIST('x', "exclude", &exclude_list, N_("pattern"),
+				N_("skip files matching pattern")),
+		OPT_STRING_LIST('X', "exclude-from", &exclude_file_list, N_("file"),
+				N_("exclude patterns are read from <file>")),
 		OPT_STRING(0, "exclude-per-directory", &dir.exclude_per_dir, N_("file"),
 			N_("read additional per-directory exclude patterns in <file>")),
-		{ OPTION_CALLBACK, 0, "exclude-standard", &dir, NULL,
-			N_("add the standard git exclusions"),
-			PARSE_OPT_NOARG, option_parse_exclude_standard },
+		OPT_BOOL(0, "exclude-standard", &exclude_standard,
+			N_("add the standard git exclusions")),
 		OPT_SET_INT_F(0, "full-name", &prefix_len,
 			      N_("make the output relative to the project top directory"),
 			      0, PARSE_OPT_NONEG),
@@ -580,15 +548,9 @@ int cmd_ls_files(int argc, const char **argv, const char *cmd_prefix)
 		prefix_len = strlen(prefix);
 	git_config(git_default_config, NULL);
 
-	if (repo_read_index(the_repository) < 0)
-		die("index file corrupt");
-
 	argc = parse_options(argc, argv, prefix, builtin_ls_files_options,
 			ls_files_usage, 0);
-	el = add_exclude_list(&dir, EXC_CMDL, "--exclude option");
-	for (i = 0; i < exclude_list.nr; i++) {
-		add_exclude(exclude_list.items[i].string, "", 0, el, --exclude_args);
-	}
+
 	if (show_tag || show_valid_bit || show_fsmonitor_bit) {
 		tag_cached = "H ";
 		tag_unmerged = "M ";
@@ -607,8 +569,6 @@ int cmd_ls_files(int argc, const char **argv, const char *cmd_prefix)
 		 * you also show the stage information.
 		 */
 		show_stage = 1;
-	if (dir.exclude_per_dir)
-		exc_given = 1;
 
 	if (require_work_tree && !is_inside_work_tree())
 		setup_work_tree();
@@ -621,6 +581,11 @@ int cmd_ls_files(int argc, const char **argv, const char *cmd_prefix)
 	if (recurse_submodules && error_unmatch)
 		die("ls-files --recurse-submodules does not support "
 		    "--error-unmatch");
+
+	/* With no flags, we default to showing the cached files */
+	if (!(show_stage || show_deleted || show_others || show_unmerged ||
+	      show_killed || show_modified || show_resolve_undo))
+		show_cached = 1;
 
 	parse_pathspec(&pathspec, 0,
 		       PATHSPEC_PREFER_CWD,
@@ -640,19 +605,41 @@ int cmd_ls_files(int argc, const char **argv, const char *cmd_prefix)
 		max_prefix = common_prefix(&pathspec);
 	max_prefix_len = get_common_prefix_len(max_prefix);
 
+	if (repo_read_index_preload(the_repository, &pathspec) < 0)
+		die("index file corrupt");
+
+	refresh_index(the_repository->index, REFRESH_QUIET|REFRESH_UNMERGED, &pathspec, NULL, NULL);
+	dir.untracked = the_repository->index->untracked;
+
 	prune_index(the_repository->index, max_prefix, max_prefix_len);
 
 	/* Treat unmatching pathspec elements as errors */
 	if (pathspec.nr && error_unmatch)
 		ps_matched = xcalloc(pathspec.nr, 1);
 
+	/* Pull in the excludes they asked for */
+	if (dir.exclude_per_dir)
+		exc_given = 1;
+	if (exclude_standard) {
+		exc_given = 1;
+		setup_standard_excludes(&dir);
+	}
+	if (exclude_list.nr) {
+		exc_given = 1;
+		el = add_exclude_list(&dir, EXC_CMDL, "--exclude option");
+		for (i = 0; i < exclude_list.nr; i++) {
+			add_exclude(exclude_list.items[i].string, "", 0, el, --exclude_args);
+		}
+	}
+	if (exclude_file_list.nr) {
+		exc_given = 1;
+		for (i = 0; i < exclude_file_list.nr; i++) {
+			add_excludes_from_file(&dir, exclude_file_list.items[i].string);
+		}
+	}
+
 	if ((dir.flags & DIR_SHOW_IGNORED) && !exc_given)
 		die("ls-files --ignored needs some exclude pattern");
-
-	/* With no flags, we default to showing the cached files */
-	if (!(show_stage || show_deleted || show_others || show_unmerged ||
-	      show_killed || show_modified || show_resolve_undo))
-		show_cached = 1;
 
 	if (with_tree) {
 		/*

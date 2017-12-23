@@ -121,3 +121,13 @@ int read_index_preload(struct index_state *index,
 	preload_index(index, pathspec);
 	return retval;
 }
+
+int read_index_preload_from(struct index_state *index,
+			    const char *path,
+			    const struct pathspec *pathspec)
+{
+	int retval = read_index_from(index, path);
+
+	preload_index(index, pathspec);
+	return retval;
+}

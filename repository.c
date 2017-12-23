@@ -257,3 +257,11 @@ int repo_read_index(struct repository *repo)
 
 	return read_index_from(repo->index, repo->index_file, repo->gitdir);
 }
+
+int repo_read_index_preload(struct repository *repo, struct pathspec *pathspec)
+{
+	if (!repo->index)
+		repo->index = xcalloc(1, sizeof(*repo->index));
+
+	return read_index_preload_from(repo->index, repo->index_file, pathspec);
+}

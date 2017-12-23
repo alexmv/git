@@ -411,6 +411,7 @@ void validate_cache_entries(const struct index_state *istate);
 #define read_cache() read_index(&the_index)
 #define read_cache_from(path) read_index_from(&the_index, (path), (get_git_dir()))
 #define read_cache_preload(pathspec) read_index_preload(&the_index, (pathspec))
+#define read_cache_preload_from(path, pathspec) read_index_preload_from(&the_index, (path), (pathspec))
 #define is_cache_unborn() is_index_unborn(&the_index)
 #define read_cache_unmerged() read_index_unmerged(&the_index)
 #define discard_cache() discard_index(&the_index)

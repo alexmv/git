@@ -131,4 +131,10 @@ void repo_clear(struct repository *repo);
  */
 int repo_read_index(struct repository *repo);
 
+/*
+ * As per repo_read_index, but if core.preloadIndex is set, also pre-loads the stat
+ * calls for pathspec, or the entire repository if NULL.
+ */
+extern int repo_read_index_preload(struct repository *repo, struct pathspec *pathspec);
+
 #endif /* REPOSITORY_H */
