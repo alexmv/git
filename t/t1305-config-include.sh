@@ -229,6 +229,19 @@ test_expect_success 'conditional include, early config reading' '
 	)
 '
 
+test_expect_success 'conditional include with /**/' '
+	mkdir foo/bar &&
+	git init foo/bar/repo &&
+	(
+		cd foo/bar/repo &&
+		echo "[includeIf \"gitdir:**/foo/**/bar/**\"]path=bar7" >>.git/config &&
+		echo "[test]seven=7" >.git/bar7 &&
+		echo 7 >expect &&
+		git config test.seven >actual &&
+		test_cmp expect actual
+	)
+'
+
 test_expect_success SYMLINKS 'conditional include, set up symlinked $HOME' '
 	mkdir real-home &&
 	ln -s real-home home &&
