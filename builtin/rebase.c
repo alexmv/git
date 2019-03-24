@@ -1552,20 +1552,21 @@ int cmd_rebase(int argc, const char **argv, const char *prefix)
 
 	/* Make sure the branch to rebase onto is valid. */
 	if (keep_base) {
-	    strbuf_reset(&buf);
-	    strbuf_addstr(&buf, options.upstream_name);
-	    strbuf_addstr(&buf, "...");
-	    options.onto_name = xstrdup(buf.buf);
+		strbuf_reset(&buf);
+		strbuf_addstr(&buf, options.upstream_name);
+		strbuf_addstr(&buf, "...");
+		options.onto_name = xstrdup(buf.buf);
 	} else if (!options.onto_name)
 		options.onto_name = options.upstream_name;
 	if (strstr(options.onto_name, "...")) {
-		if (get_oid_mb(options.onto_name, &merge_base) < 0)
-		    if (keep_base)
-			die(_("'%s': need exactly one merge base with branch"),
-				options.upstream_name);
-		    else
-			die(_("'%s': need exactly one merge base"),
-			    options.onto_name);
+		if (get_oid_mb(options.onto_name, &merge_base) < 0) {
+			if (keep_base)
+				die(_("'%s': need exactly one merge base with branch"),
+				    options.upstream_name);
+			else
+				die(_("'%s': need exactly one merge base"),
+				    options.onto_name);
+		}
 		options.onto = lookup_commit_or_die(&merge_base,
 						    options.onto_name);
 	} else {
